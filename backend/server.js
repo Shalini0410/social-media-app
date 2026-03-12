@@ -6,7 +6,8 @@ const dotenv = require("dotenv");
 dotenv.config({ path: __dirname + "/.env" });
 
 const authRoutes = require("./routes/authRoutes");
-const postRoutes = require("./routes/postRoutes");   // ✅ ADD THIS
+const postRoutes = require("./routes/postRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 const app = express();
 
@@ -22,7 +23,8 @@ mongoose
   });
 
 app.use("/api/auth", authRoutes);
-app.use("/api/posts", postRoutes);   // ✅ ADD THIS
+app.use("/api/posts", postRoutes);
+app.use("/api/users", userRoutes);
 
 app.get("/", (req, res) => {
   res.send("API Running...");

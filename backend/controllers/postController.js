@@ -20,19 +20,20 @@ exports.createPost = async (req, res) => {
 // GET ALL POSTS
 exports.getAllPosts = async (req, res) => {
   try {
-    const posts = await Post.find().sort({ createdAt: -1 });
+    const { limit = 10, skip = 0 } = req.query;
 
-    const postsWithUser = await Promise.all(
-      posts.map(async (post) => {
-        const user = await User.findById(post.userId);
-        return {
-          ...post._doc,
-          username: user.username,
-        };
-      })
-    );
+    const posts = await Post.find()
+      .populate("userId", "username email") // Fetch username and email from User model
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(parseInt(skip));
 
-    res.json(postsWithUser);
+    const formattedPosts = posts.map(post => ({
+      ...post._doc,
+      username: post.userId?.username || "Deleted User",
+    }));
+
+    res.json(formattedPosts);
 
   } catch (err) {
     res.status(500).json(err.message);
@@ -41,35 +42,63 @@ exports.getAllPosts = async (req, res) => {
 exports.likePost = async (req, res) => {
   try {
     const post = await Post.findById(req.params.id);
-
+    
     if (!post.likes.includes(req.user.id)) {
       await post.updateOne({ $push: { likes: req.user.id } });
-      res.status(200).json("Post liked ❤️");
+      const updatedPost = await Post.findById(req.params.id).populate("userId", "username email");
+      res.status(200).json({ message: "Post liked ❤️", likes: updatedPost.likes });
     } else {
       await post.updateOne({ $pull: { likes: req.user.id } });
-      res.status(200).json("Post unliked 💔");
+      const updatedPost = await Post.findById(req.params.id).populate("userId", "username email");
+      res.status(200).json({ message: "Post unliked 💔", likes: updatedPost.likes });
     }
-
   } catch (err) {
     res.status(500).json(err.message);
   }
 };
+
 exports.addComment = async (req, res) => {
   try {
-    const post = await Post.findById(req.params.id);
-
-    await post.updateOne({
-      $push: {
-        comments: {
-          userId: req.user.id,
-          text: req.body.text,
+    const updatedPost = await Post.findByIdAndUpdate(
+      req.params.id,
+      {
+        $push: {
+          comments: {
+            userId: req.user.id,
+            text: req.body.text,
+          },
         },
       },
-    });
+      { new: true }
+    ).populate("comments.userId", "username");
 
-    res.status(200).json("Comment added 💬");
-
+    res.status(200).json({ message: "Comment added 💬", comments: updatedPost.comments });
   } catch (err) {
     res.status(500).json(err.message);
+  }
+};
+
+// GET TIMELINE POSTS (Following only)
+exports.getTimelinePosts = async (req, res) => {
+  try {
+    const currentUser = await User.findById(req.user.id);
+    const { limit = 10, skip = 0 } = req.query;
+
+    const posts = await Post.find({
+      userId: { $in: currentUser.following }
+    })
+      .populate("userId", "username email")
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(parseInt(skip));
+
+    const formattedPosts = posts.map(post => ({
+      ...post._doc,
+      username: post.userId?.username || "Deleted User",
+    }));
+
+    res.status(200).json(formattedPosts);
+  } catch (err) {
+    res.status(500).json(err);
   }
 };

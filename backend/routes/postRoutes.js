@@ -8,6 +8,7 @@ router.put("/:id/comment", verifyToken, addComment);
 
 router.put("/:id/like", verifyToken, likePost);
 router.post("/", verifyToken, postController.createPost);
+router.get("/timeline", verifyToken, postController.getTimelinePosts);
 router.get("/", postController.getAllPosts);
 
 module.exports = router;
